@@ -1,51 +1,68 @@
 import requests
-import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-from collections import defaultdict
+import numpy as np
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='urllib3')
 
-# Récupération des données depuis l'API
+# 🔗 API URL
 url = "http://127.0.0.1:8000/kpis"
 response = requests.get(url)
-data = response.json()
+data_json = response.json()
 
-# Calcul des moyennes par KPI
-kpi_values = defaultdict(list)
-for item in data:
-    kpi_values[item['kpi_name']].append(item['value'])
+seuils = {
+    "Order Fulfillment Rate": 50.0,
+    "Inventory Turnover": 6.0,
+    "Order Accuracy": 50.0,
+    "Supplier Lead Time": 20.0,  # Plus bas = mieux
+    "Return Rate": 10.0,         # Plus bas = mieux
+    "Lead Time": 4.0            # Plus bas = mieux
+}
+# ✅ Transformation en DataFrame
+df = pd.DataFrame(data_json)
+df["date"] = pd.to_datetime(df["date"])
+# Vérification des valeurs dans les KPI avant l'agrégation
+# Afficher les valeurs de chaque KPI pour voir si des zéros ou des valeurs manquantes existent
+for kpi in seuils.keys():
+    print(f"Valeurs pour {kpi} avant agrégation :")
+    print(df[df["kpi_name"] == kpi]["value"])
 
-kpi_avg = {kpi: sum(values) / len(values)
-           for kpi, values in kpi_values.items()}
+# Filtrer les valeurs égales à zéro ou manquantes avant l'agrégation
+df_cleaned = df[df["value"] > 0]  # Garder les valeurs strictement positives (ou remplace 0 par NaN si nécessaire)
 
-# Préparation des données pour le radar chart
-categories = list(kpi_avg.keys())
-values = list(kpi_avg.values())
-values += values[:1]  # Fermer la boucle
-num_vars = len(categories)
-angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+# Agréger les données en calculant la moyenne des valeurs pour chaque KPI après nettoyage
+df_aggregated = df_cleaned.groupby("kpi_name").agg({"value": "mean"}).reset_index()
+
+
+# 🎯 KPI à afficher dans l’ordre souhaité
+kpi_names = list(seuils.keys())
+
+# Garder seulement les KPI dans la liste des seuils
+df_aggregated = df_aggregated[df_aggregated["kpi_name"].isin(kpi_names)]
+
+# Trier les données dans l'ordre des KPI souhaité
+df_aggregated = df_aggregated.set_index("kpi_name").loc[kpi_names].reset_index()
+
+# Valeurs moyennes et seuils
+values = df_aggregated["value"].tolist()
+seuils_values = [seuils[kpi] for kpi in kpi_names]
+
+# 🕸 Préparation du Radar Chart
+angles = np.linspace(0, 2 * np.pi, len(kpi_names), endpoint=False).tolist()
+values += values[:1]  # Reprendre la première valeur pour fermer le cercle
+seuils_values += seuils_values[:1]
 angles += angles[:1]
 
-# Création du radar chart
-fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
-ax.plot(angles, values, color='blue', linewidth=2, linestyle='solid')
-ax.fill(angles, values, color='blue', alpha=0.25)
+# Affichage du graphique radar
+plt.figure(figsize=(8, 6))
+ax = plt.subplot(111, polar=True)
+ax.plot(angles, values, 'o-', linewidth=2, label='Valeurs Moyennes')
+ax.fill(angles, values, alpha=0.25)
+ax.plot(angles, seuils_values, 'o--', color='red', linewidth=2, label='Seuils')
+ax.fill(angles, seuils_values, color='red', alpha=0.1)
 
-# Configuration des axes
-ax.set_xticks(angles[:-1])
-ax.set_xticklabels(categories, fontsize=10)
-
-# Ajout d'étiquettes radiales pour chaque axe
-for i, angle in enumerate(angles[:-1]):
-    ax.text(angle, max(values) * 1.1, f"{values[i]:.2f}",
-            ha='center', va='center', fontsize=8)
-
-    # Ajout d'une échelle simple
-    ax.text(angle, max(values) * 0.9, f"0-{int(max(values))}",
-            ha='center', va='center', fontsize=6, rotation=90 - angle * 180 / np.pi)
-
-# Ajout de quelques étiquettes radiales pour l'échelle
-ax.set_yticks([0, max(values) * 0.5, max(values)])
-ax.set_yticklabels(['0', f"{max(values) * 0.5:.1f}", f"{max(values):.1f}"], fontsize=8)
-
-plt.title('Moyennes des KPIs', size=15, y=1.1)
+ax.set_thetagrids(np.degrees(angles[:-1]), kpi_names)
+plt.title("Comparaison KPI vs Seuils (Valeur Moyenne)", size=15)
+plt.legend(loc='upper right')
 plt.tight_layout()
 plt.show()
