@@ -91,3 +91,64 @@ plt.title("Comparaison KPI vs Seuils", size=15)
 plt.legend(loc='upper right')
 plt.tight_layout()
 plt.show()
+
+import matplotlib.pyplot as plt
+
+# 🖼️ Générer un rapport visuel avec matplotlib
+fig, ax = plt.subplots(figsize=(10, 8))
+ax.axis("off")
+
+reco_lines = [" Axes d'amélioration logistique", ""]
+
+if kpis['Ponctualité Client (%)'] < seuils['Ponctualité Client (%)']:
+    reco_lines += [
+        "Ponctualité client",
+        "→ Réduire les délais d’expédition",
+        "→ Suivi temps réel des transporteurs",
+        "→ Optimiser les tournées", ""
+    ]
+
+if kpis['ISR (Stock/Ventes)'] > seuils['ISR (Stock/Ventes)']:
+    reco_lines += [
+        "Ratio Stock/Ventes",
+        "→ Ajuster le stock à la demande",
+        "→ Réévaluer les seuils de réapprovisionnement", ""
+    ]
+
+if kpis['Ponctualité Fournisseurs (%)'] < seuils['Ponctualité Fournisseurs (%)']:
+    reco_lines += [
+        " Fiabilité fournisseurs",
+        "→ Identifier les non-conformités",
+        "→ Mettre en place des SLA",
+        "→ Diversifier les fournisseurs", ""
+    ]
+
+if kpis['DSI (jours)'] > seuils['DSI (jours)']:
+    reco_lines += [
+        "Rotation des stocks (DSI)",
+        "→ Destocker les produits lents",
+        "→ Lancer des promotions ciblées",
+        "→ Améliorer la prévision de la demande", ""
+    ]
+
+if kpis['Coût transport/tonne (€)'] > seuils['Coût transport/tonne (€)']:
+    reco_lines += [
+        " Coût de transport élevé",
+        "→ Regrouper les expéditions",
+        "→ Négocier avec les transporteurs",
+        "→ Optimiser le chargement", ""
+    ]
+
+if kpis['Commandes parfaites (%)'] < seuils['Commandes parfaites (%)']:
+    reco_lines += [
+        " Commandes parfaites insuffisantes",
+        "→ Améliorer le contrôle qualité",
+        "→ Réduire les erreurs de picking",
+        "→ Digitaliser le suivi de commande", ""
+    ]
+
+# 💬 Afficher tout le texte dans le graphe
+ax.text(0.01, 1.0, "\n".join(reco_lines), fontsize=12, va="top")
+
+plt.tight_layout()
+plt.show()
