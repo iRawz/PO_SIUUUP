@@ -1,154 +1,51 @@
-import matplotlib.pyplot as plt
-import seaborn as sns
+import requests
 import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
-# ✅ Données simulées
-data = {
-    'commandes': 500,
-    'commandes_livrees_a_temps': 420,
-    'stock_moyen': 120000,  # en €
-    'ventes_net': 600000,   # en €
-    'cout_biens_vendus': 450000,
-    'taux_possession': 0.25,
-    'commandes_parfaites': 385,
-    'cout_total_transport': 75000,  # en €
-    'tonnage_total': 1500,  # en tonnes
-    'delais_livraisons_fournisseurs': [True, True, False, True, False, True, True, True, False, True],
-}
+# Récupération des données depuis l'API
+url = "http://127.0.0.1:8000/kpis"
+response = requests.get(url)
+data = response.json()
 
-# ✅ Calcul des KPI
-kpis = {}
+# Calcul des moyennes par KPI
+kpi_values = defaultdict(list)
+for item in data:
+    kpi_values[item['kpi_name']].append(item['value'])
 
-# 1. Livraison à l’heure (Ponctualité client)
-kpis['Ponctualité Client (%)'] = round(data['commandes_livrees_a_temps'] / data['commandes'] * 100, 2)
+kpi_avg = {kpi: sum(values) / len(values)
+           for kpi, values in kpi_values.items()}
 
-# 2. Ratio Stock / Ventes (ISR)
-kpis['ISR (Stock/Ventes)'] = round(data['stock_moyen'] / data['ventes_net'], 2)
-
-# 3. Coût de possession du stock
-kpis['Coût de possession du stock (€)'] = round(data['stock_moyen'] * data['taux_possession'], 2)
-
-# 4. Ponctualité fournisseurs
-ponctualite_fournisseurs = sum(data['delais_livraisons_fournisseurs']) / len(data['delais_livraisons_fournisseurs']) * 100
-kpis['Ponctualité Fournisseurs (%)'] = round(ponctualite_fournisseurs, 2)
-
-# 5. DSI – Durée moyenne de rotation des stocks
-kpis['DSI (jours)'] = round((data['stock_moyen'] / data['cout_biens_vendus']) * 365, 1)
-
-# 6. Coût transport par tonne
-kpis['Coût transport/tonne (€)'] = round(data['cout_total_transport'] / data['tonnage_total'], 2)
-
-# 7. Taux de commandes parfaites
-kpis['Commandes parfaites (%)'] = round(data['commandes_parfaites'] / data['commandes'] * 100, 2)
-
-# ✅ Affichage des KPI
-print("🔍 Résumé des KPI logistiques :\n")
-for k, v in kpis.items():
-    print(f"{k}: {v}")
-
-# ✅ Comparaison avec les seuils standards
-seuils = {
-    'Ponctualité Client (%)': 95,
-    'ISR (Stock/Ventes)': 0.2,
-    'Ponctualité Fournisseurs (%)': 90,
-    'DSI (jours)': 60,
-    'Coût transport/tonne (€)': 50,
-    'Commandes parfaites (%)': 98
-}
-
-# ✅ Visualisation radar
-import pandas as pd
-
-kpi_names = list(seuils.keys())
-kpi_values = [kpis[k] for k in kpi_names]
-kpi_seuils = [seuils[k] for k in kpi_names]
-
-df_kpi = pd.DataFrame({
-    'KPI': kpi_names,
-    'Valeur Réelle': kpi_values,
-    'Seuil Recommandé': kpi_seuils
-})
-
-angles = np.linspace(0, 2 * np.pi, len(kpi_names), endpoint=False).tolist()
-values = df_kpi['Valeur Réelle'].tolist()
-seuils_plot = df_kpi['Seuil Recommandé'].tolist()
-
-# Fermer le cercle
-values += values[:1]
-seuils_plot += seuils_plot[:1]
+# Préparation des données pour le radar chart
+categories = list(kpi_avg.keys())
+values = list(kpi_avg.values())
+values += values[:1]  # Fermer la boucle
+num_vars = len(categories)
+angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
 angles += angles[:1]
 
-# Radar chart
-plt.figure(figsize=(8, 6))
-ax = plt.subplot(111, polar=True)
-ax.plot(angles, values, 'o-', linewidth=2, label='Valeur Réelle')
-ax.fill(angles, values, alpha=0.25)
-ax.plot(angles, seuils_plot, 'o--', color='red', linewidth=2, label='Seuil')
-ax.fill(angles, seuils_plot, color='red', alpha=0.1)
+# Création du radar chart
+fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+ax.plot(angles, values, color='blue', linewidth=2, linestyle='solid')
+ax.fill(angles, values, color='blue', alpha=0.25)
 
-ax.set_thetagrids(np.degrees(angles[:-1]), kpi_names)
-plt.title("Comparaison KPI vs Seuils", size=15)
-plt.legend(loc='upper right')
-plt.tight_layout()
-plt.show()
+# Configuration des axes
+ax.set_xticks(angles[:-1])
+ax.set_xticklabels(categories, fontsize=10)
 
-import matplotlib.pyplot as plt
+# Ajout d'étiquettes radiales pour chaque axe
+for i, angle in enumerate(angles[:-1]):
+    ax.text(angle, max(values) * 1.1, f"{values[i]:.2f}",
+            ha='center', va='center', fontsize=8)
 
-# 🖼️ Générer un rapport visuel avec matplotlib
-fig, ax = plt.subplots(figsize=(10, 8))
-ax.axis("off")
+    # Ajout d'une échelle simple
+    ax.text(angle, max(values) * 0.9, f"0-{int(max(values))}",
+            ha='center', va='center', fontsize=6, rotation=90 - angle * 180 / np.pi)
 
-reco_lines = [" Axes d'amélioration logistique", ""]
+# Ajout de quelques étiquettes radiales pour l'échelle
+ax.set_yticks([0, max(values) * 0.5, max(values)])
+ax.set_yticklabels(['0', f"{max(values) * 0.5:.1f}", f"{max(values):.1f}"], fontsize=8)
 
-if kpis['Ponctualité Client (%)'] < seuils['Ponctualité Client (%)']:
-    reco_lines += [
-        "Ponctualité client",
-        "→ Réduire les délais d’expédition",
-        "→ Suivi temps réel des transporteurs",
-        "→ Optimiser les tournées", ""
-    ]
-
-if kpis['ISR (Stock/Ventes)'] > seuils['ISR (Stock/Ventes)']:
-    reco_lines += [
-        "Ratio Stock/Ventes",
-        "→ Ajuster le stock à la demande",
-        "→ Réévaluer les seuils de réapprovisionnement", ""
-    ]
-
-if kpis['Ponctualité Fournisseurs (%)'] < seuils['Ponctualité Fournisseurs (%)']:
-    reco_lines += [
-        " Fiabilité fournisseurs",
-        "→ Identifier les non-conformités",
-        "→ Mettre en place des SLA",
-        "→ Diversifier les fournisseurs", ""
-    ]
-
-if kpis['DSI (jours)'] > seuils['DSI (jours)']:
-    reco_lines += [
-        "Rotation des stocks (DSI)",
-        "→ Destocker les produits lents",
-        "→ Lancer des promotions ciblées",
-        "→ Améliorer la prévision de la demande", ""
-    ]
-
-if kpis['Coût transport/tonne (€)'] > seuils['Coût transport/tonne (€)']:
-    reco_lines += [
-        " Coût de transport élevé",
-        "→ Regrouper les expéditions",
-        "→ Négocier avec les transporteurs",
-        "→ Optimiser le chargement", ""
-    ]
-
-if kpis['Commandes parfaites (%)'] < seuils['Commandes parfaites (%)']:
-    reco_lines += [
-        " Commandes parfaites insuffisantes",
-        "→ Améliorer le contrôle qualité",
-        "→ Réduire les erreurs de picking",
-        "→ Digitaliser le suivi de commande", ""
-    ]
-
-# 💬 Afficher tout le texte dans le graphe
-ax.text(0.01, 1.0, "\n".join(reco_lines), fontsize=12, va="top")
-
+plt.title('Moyennes des KPIs', size=15, y=1.1)
 plt.tight_layout()
 plt.show()
